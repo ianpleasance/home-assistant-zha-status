@@ -1,12 +1,12 @@
 name: ZHA Device Status
-version: "1.0"
-slug: zha_device_status
+version: "0.1"
+slug: zha_status
 description: Tracks and displays Zigbee device data from ZHA
 startup: services
 boot: auto
 init: false
 ingress: false
-panel_title: ZHA Status
+panel_title: ZHA Device Status
 panel_icon: mdi:zigbee
 panel_admin: false
 webui: http://[HOST]:5000
