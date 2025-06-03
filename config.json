@@ -1,10 +1,12 @@
 {
   "name": "ZHA Status Tracker",
-  "version": "1.0",
+  "version": "0.0",
   "slug": "zha_status_tracker",
   "description": "Tracks and displays Zigbee device data from ZHA",
   "startup": "services",
   "boot": "auto",
+  "init": false,
+  "ingress": false,
   "panel_title": "ZHA Status",
   "panel_icon": "mdi:zigbee",
   "panel_admin": false,
@@ -16,3 +18,4 @@
   "options": {},
   "schema": {}
 }
+
