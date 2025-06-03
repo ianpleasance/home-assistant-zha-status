@@ -18,7 +18,3 @@ arch:
   - amd64
   - aarch64
   - armv7
-options:
-  ha_token: ""
-schema:
-  ha_token: str
