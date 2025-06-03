@@ -1,15 +1,18 @@
 import asyncio
 import websockets
 import json
-from datetime import datetime
 import os
+from datetime import datetime
 
-# Internal hostname used inside Supervisor network
+# WebSocket URL for Home Assistant (internal IP)
 HA_URL = "ws://172.30.32.1:8123/api/websocket"
+HA_TOKEN = os.environ.get("HA_TOKEN")
 OUTPUT_FILE = "/app/data/zha_data.json"
 
-
 async def get_zha_data():
+    if not HA_TOKEN:
+        raise EnvironmentError("HA_TOKEN is not set. Please provide it via the add-on configuration.")
+
     async with websockets.connect(HA_URL) as ws:
         msg_id = 1
 
@@ -17,18 +20,20 @@ async def get_zha_data():
         hello = await ws.recv()
         print("Received hello:", hello)
 
-        # Step 2: NO auth needed — Supervisor handles it internally
+        # Step 2: send auth
+        await ws.send(json.dumps({
+            "type": "auth",
+            "access_token": HA_TOKEN
+        }))
 
-        # Step 3: wait for auth_ok or ready
+        # Step 3: wait for auth_ok
         while True:
             response = json.loads(await ws.recv())
-            print("Received:", response)
-            if response.get("type") in ("auth_ok", "ready"):
+            print("Auth response:", response)
+            if response.get("type") == "auth_ok":
                 break
-            elif response.get("type") == "auth_required":
-                raise Exception("Unexpected: auth_required without auth_needed")
             elif response.get("type") == "auth_invalid":
-                raise Exception(f"Authentication failed: {response}")
+                raise Exception("Authentication failed")
 
         # Step 4: request ZHA device list
         await ws.send(json.dumps({
@@ -46,7 +51,7 @@ async def get_zha_data():
             name = device.get("user_given_name") or device.get("name") or "Unknown"
             last_seen = device.get("last_seen")
 
-            # Get neighbors for each device
+            # Request neighbors
             await ws.send(json.dumps({
                 "id": msg_id,
                 "type": "zha/device_neighbors",
@@ -75,12 +80,14 @@ async def get_zha_data():
 
             await asyncio.sleep(0.1)
 
+        # Save output
         os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
         with open(OUTPUT_FILE, "w") as f:
             json.dump({
                 "timestamp": datetime.utcnow().isoformat(),
                 "devices": output
             }, f, indent=2)
+
         print(f"Saved ZHA device data to {OUTPUT_FILE}")
 
 
