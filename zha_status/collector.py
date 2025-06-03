@@ -5,7 +5,9 @@ import os
 from datetime import datetime
 
 # WebSocket URL for Home Assistant (internal IP)
-HA_URL = "ws://172.30.32.1:8123/api/websocket"
+#HA_URL = "ws://172.30.32.1:8123/api/websocket"
+HA_URL = "ws://supervisor/core/websocket"
+
 HA_TOKEN = os.environ.get("HA_TOKEN")
 OUTPUT_FILE = "/app/data/zha_data.json"
 
@@ -17,8 +19,11 @@ async def get_zha_data():
         msg_id = 1
 
         # Step 1: receive 'hello'
-        hello = await ws.recv()
-        print("Received hello:", hello)
+        auth_required = json.loads(await ws.recv())
+        if auth_required.get("type") != "auth_required":
+            raise Exception("Expected 'auth_required', got something else")
+
+        print("Received auth_required:", json.dumps(auth_required))
 
         # Step 2: send auth
         await ws.send(json.dumps({
