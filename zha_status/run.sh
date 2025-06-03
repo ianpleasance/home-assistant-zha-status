@@ -2,6 +2,12 @@
 
 # Read user-supplied HA token from config
 HA_TOKEN=$(jq -r '.ha_token' /data/options.json)
+if [ "${HA_TOKEN}" ]
+  then
+    echo "HA_TOKEN=${HA_TOKEN}"
+else
+    echo "HA_TOKEN not found in configuration"
+fi
 export HA_TOKEN
 
 # Start Flask UI in background
