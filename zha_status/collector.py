@@ -5,7 +5,7 @@ from datetime import datetime
 import os
 
 # Internal hostname used inside Supervisor network
-HA_URL = "ws://core-homeassistant:8123/api/websocket"
+HA_URL = "ws://172.30.32.1:8123/api/websocket"
 OUTPUT_FILE = "/app/data/zha_data.json"
 
 
