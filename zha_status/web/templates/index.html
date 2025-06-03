@@ -15,6 +15,11 @@
 </head>
 <body>
   <h1>ZHA Device Status</h1>
+  {% if data.timestamp %}
+  <p>Last Data Update: {{ data.timestamp }}</p>
+  {% else %}
+  <p>No data collected yet.</p>
+  {% endif %}
   <p><a href="/refresh">🔁 Refresh Now</a></p>
   <table id="zha-table" class="display">
     <thead>
@@ -49,7 +54,7 @@
         <td>{{ d.lqi }}</td>
         <td>{{ d.rssi }}</td>
         <td>{{ d.ieee }}</td>
-        <td>{{ d.nwk }}</td>
+        <td>0x{{ "%04x" % d.nwk if d.nwk is not none else '' }}</td>
         <td>{{ d.device_type }}</td>
         <td>{{ d.power_source }}</td>
         <td><pre>{{ d.attributes }}</pre></td>
@@ -58,13 +63,17 @@
     </tbody>
   </table>
 
-  <script>
-    $(document).ready(function () {
-      $('#zha-table').DataTable({
-        dom: 'Bfrtip',
-        buttons: ['csv']
-      });
-    });
-  </script>
+  <script>
+    $(document).ready(function () {
+      $('#zha-table').DataTable({
+        dom: 'Bfrtip',
+        buttons: ['csv'],
+        // --- START OF NEW CODE FOR PAGINATION ---
+        "lengthMenu": [[25, 50, 100, 1000, -1], [25, 50, 100, 1000, "All"]],
+        "pageLength": 100 // Default to 100
+        // --- END OF NEW CODE ---
+      });
+    });
+  </script>
 </body>
 </html>

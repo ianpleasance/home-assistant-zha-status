@@ -1,5 +1,5 @@
 name: ZHA Device Status
-version: "0.87"
+version: "0.88"
 slug: zha_status
 description: Tracks and displays Zigbee device data from ZHA
 startup: services
@@ -20,5 +20,7 @@ arch:
   - armv7
 options:
   ha_token: ""
+  use_ssl: true
 schema:
   ha_token: str
+  use_ssl: bool

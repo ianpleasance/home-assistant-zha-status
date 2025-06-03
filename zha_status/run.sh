@@ -2,6 +2,7 @@
 
 # Export token to environment
 export HA_TOKEN=$(jq -r '.ha_token' /data/options.json)
+export USE_SSL=$(jq -r '.use_ssl' /data/options.json)
 
 # Start Flask UI in background
 cd web

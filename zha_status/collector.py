@@ -5,27 +5,29 @@ import os
 from datetime import datetime
 import ssl
 
-# WebSocket URL for Home Assistant (internal IP)
-#HA_URL = "ws://172.30.32.1:8123/api/websocket"
-#HA_URL = "ws://supervisor/core/websocket"
-#HA_URL = "ws://172.30.32.1:8123/api/websocket"
-HA_URL = "wss://172.30.32.1:8123/api/websocket"
-
 HA_TOKEN = os.environ.get("HA_TOKEN")
+USE_SSL = os.environ.get("USE_SSL")
+
 OUTPUT_FILE = "/app/data/zha_data.json"
+
+# WebSocket URL for Home Assistant (internal IP)
+if USE_SSL:
+  # Create an SSL context that disables hostname checking and certificate verification
+  # This is suitable for internal communication where the certificate is not issued
+  # for the internal IP address.
+  ssl_context = ssl.create_default_context()
+  ssl_context.check_hostname = False
+  ssl_context.verify_mode = ssl.CERT_NONE
+  HA_URL = "wss://172.30.32.1:8123/api/websocket"
+else
+  HA_URL = "ws://172.30.32.1:8123/api/websocket"
+  ssl_context = None
 
 async def get_zha_data():
     if not HA_TOKEN:
         raise EnvironmentError("HA_TOKEN is not set. Please provide it via the add-on configuration.")
 
-    print("Connecting to websocket URL: ", HA_URL)
-
-    # Create an SSL context that disables hostname checking and certificate verification
-    # This is suitable for internal communication where the certificate is not issued
-    # for the internal IP address.
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
+    print(f"Connecting to websocket URL: {HA_URL} (SSL enabled: {USE_SSL}")
 
     async with websockets.connect(HA_URL, ssl=ssl_context) as ws:
         msg_id = 1
