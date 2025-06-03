@@ -15,8 +15,12 @@ async def get_zha_data():
     if not HA_TOKEN:
         raise EnvironmentError("HA_TOKEN is not set. Please provide it via the add-on configuration.")
 
+    print("Connecting to websocket URL: ", HA_URL)
+
     async with websockets.connect(HA_URL) as ws:
         msg_id = 1
+
+        print("Connected")
 
         # Step 1: receive 'hello'
         auth_required = json.loads(await ws.recv())
