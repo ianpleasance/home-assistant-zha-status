@@ -9,11 +9,15 @@ ingress: false
 panel_title: ZHA Device Status
 panel_icon: mdi:zigbee
 panel_admin: false
-webui: http://[HOST]:5000
+webui: http://[HOST]:[PORT:5000]
 ports:
   5000/tcp: 5000
 map:
   - config:rw
+arch:
+  - amd64
+  - aarch64
+  - armv7
 options:
   ha_token: ""
 schema:
