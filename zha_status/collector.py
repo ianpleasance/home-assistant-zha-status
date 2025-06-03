@@ -7,7 +7,8 @@ from datetime import datetime
 # WebSocket URL for Home Assistant (internal IP)
 #HA_URL = "ws://172.30.32.1:8123/api/websocket"
 #HA_URL = "ws://supervisor/core/websocket"
-HA_URL = "ws://172.30.32.1:8123/api/websocket"
+#HA_URL = "ws://172.30.32.1:8123/api/websocket"
+HA_URL = "wss://172.30.32.1:8123/api/websocket"
 
 HA_TOKEN = os.environ.get("HA_TOKEN")
 OUTPUT_FILE = "/app/data/zha_data.json"
