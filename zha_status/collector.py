@@ -4,7 +4,8 @@ import json
 from datetime import datetime
 import os
 
-HA_URL = "ws://homeassistant.local:8123/api/websocket"
+HA_URL = "ws://supervisor/core/api/websocket"
+
 LONG_LIVED_TOKEN = os.environ.get("HA_TOKEN")
 OUTPUT_FILE = "/app/data/zha_data.json"
 
