@@ -22,4 +22,3 @@ options:
   ha_token: ""
 schema:
   ha_token: str
-
