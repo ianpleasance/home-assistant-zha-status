@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ZHA Device Status</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+  <style>
+    table { width: 100%; }
+    .online { color: green; font-weight: bold; }
+    .offline { color: red; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>ZHA Device Status</h1>
+  <p><a href="/refresh">🔁 Refresh Now</a></p>
+  <table id="zha-table" class="display">
+    <thead>
+      <tr>
+        <th>Device Name</th>
+        <th>Last Seen</th>
+        <th>Area</th>
+        <th>Manufacturer</th>
+        <th>Model</th>
+        <th>Quirk</th>
+        <th>LQI</th>
+        <th>RSSI</th>
+        <th>IEEE</th>
+        <th>Nwk</th>
+        <th>Device Type</th>
+        <th>Power Source</th>
+        <th>Attributes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in data.devices %}
+      {% set last = d.last_seen or '' %}
+      {% set ago = (datetime.utcnow() - datetime.fromisoformat(last.replace('Z', ''))) if last else 9999 %}
+      {% set cls = 'online' if ago.total_seconds() < 3600 else 'offline' %}
+      <tr>
+        <td class="{{ cls }}">{{ d.name }}</td>
+        <td>{{ d.last_seen }}</td>
+        <td>{{ d.area }}</td>
+        <td>{{ d.manufacturer }}</td>
+        <td>{{ d.model }}</td>
+        <td>{{ d.quirk }}</td>
+        <td>{{ d.lqi }}</td>
+        <td>{{ d.rssi }}</td>
+        <td>{{ d.ieee }}</td>
+        <td>{{ d.nwk }}</td>
+        <td>{{ d.device_type }}</td>
+        <td>{{ d.power_source }}</td>
+        <td><pre>{{ d.attributes }}</pre></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <script>
+    $(document).ready(function () {
+      $('#zha-table').DataTable({
+        dom: 'Bfrtip',
+        buttons: ['csv']
+      });
+    });
+  </script>
+</body>
+</html>
