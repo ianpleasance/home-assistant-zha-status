@@ -1,6 +1,6 @@
 {
   "name": "ZHA Status Tracker",
-  "version": "0.0",
+  "version": "1.0",
   "slug": "zha_status_tracker",
   "description": "Tracks and displays Zigbee device data from ZHA",
   "startup": "services",
@@ -15,7 +15,11 @@
     "5000/tcp": 5000
   },
   "map": ["config:rw"],
-  "options": {},
-  "schema": {}
+  "options": {
+    "ha_token": ""
+  },
+  "schema": {
+    "ha_token": "str"
+  }
 }
 
