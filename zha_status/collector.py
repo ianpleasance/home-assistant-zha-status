@@ -3,6 +3,7 @@ import websockets
 import json
 import os
 from datetime import datetime
+import ssl
 
 # WebSocket URL for Home Assistant (internal IP)
 #HA_URL = "ws://172.30.32.1:8123/api/websocket"
