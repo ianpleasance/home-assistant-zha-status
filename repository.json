@@ -1,6 +1,6 @@
 {
-  "name": "ZHA Status Tracker",
+  "name": "ZHA Device Status",
   "url": "https://github.com/ianpleasance/home-assistant-zha-status",
-  "maintainer": "ianpleasance"
+  "maintainer": "Ian Pleasance <ianpleasance@gmail.com"
 }
 
