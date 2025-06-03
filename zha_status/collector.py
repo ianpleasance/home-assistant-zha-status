@@ -19,7 +19,14 @@ async def get_zha_data():
 
     print("Connecting to websocket URL: ", HA_URL)
 
-    async with websockets.connect(HA_URL) as ws:
+    # Create an SSL context that disables hostname checking and certificate verification
+    # This is suitable for internal communication where the certificate is not issued
+    # for the internal IP address.
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
+
+    async with websockets.connect(HA_URL, ssl=ssl_context) as ws:
         msg_id = 1
 
         print("Connected")
