@@ -29,12 +29,19 @@ async def get_zha_data():
     try:
         async with websockets.connect(HA_URL, ssl=ssl_context if USE_SSL else None) as ws:
             print("WebSocket connection established. Sending authentication...")
-            await ws.send(json.dumps({
-                "id": 1,
+
+            auth_message_payload = {
                 "type": "auth",
                 "access_token": HA_TOKEN
-            }))
-            auth_response = json.loads(await ws.recv())
+            }
+            auth_message_json = json.dumps(auth_message_payload)
+            print(f"Sending authentication message: {auth_message_json}")
+
+            await ws.send(auth_message_json)
+
+            raw_auth_response = await ws.recv()
+            print(f"Received raw authentication response: {raw_auth_response}")
+            auth_response = json.loads(raw_auth_response)
 
             if auth_response.get("type") == "auth_ok":
                 print("Authentication successful!")
