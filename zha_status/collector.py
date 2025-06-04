@@ -17,9 +17,10 @@ if USE_SSL:
   # Create an SSL context that disables hostname checking and certificate verification
   # This is suitable for internal communication where the certificate is not issued
   # for the internal IP address.
-  ssl_context = ssl.create_default_context()
-  ssl_context.check_hostname = False
-  ssl_context.verify_mode = ssl.CERT_NONE
+# ssl_context = ssl.create_default_context()
+# ssl_context.check_hostname = False
+# ssl_context.verify_mode = ssl.CERT_NONE
+  ssl_context = ssl._create_unverified_context()
   HA_URL = "wss://172.30.32.1:8123/api/websocket"
 else:
   HA_URL = "ws://172.30.32.1:8123/api/websocket"
