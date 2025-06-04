@@ -32,7 +32,7 @@ async def get_zha_data():
             await ws.send(json.dumps({
                 "id": 1,
                 "type": "auth",
-                "access_token": ACCESS_TOKEN
+                "access_token": HA_TOKEN
             }))
             auth_response = json.loads(await ws.recv())
 
