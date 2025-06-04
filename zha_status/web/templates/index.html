@@ -36,6 +36,7 @@
         <th>Nwk</th>
         <th>Device Type</th>
         <th>Power Source</th>
+        <th>Neighbors</th>
         <th>Attributes</th>
       </tr>
     </thead>
@@ -57,6 +58,7 @@
         <td>0x{{ "%04x" % d.nwk if d.nwk is not none else '' }}</td>
         <td>{{ d.device_type }}</td>
         <td>{{ d.power_source }}</td>
+        <td>{{ d.neighbors }}</td>
         <td><pre>{{ d.attributes }}</pre></td>
       </tr>
       {% endfor %}

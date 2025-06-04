@@ -19,7 +19,7 @@ if USE_SSL:
   ssl_context.check_hostname = False
   ssl_context.verify_mode = ssl.CERT_NONE
   HA_URL = "wss://172.30.32.1:8123/api/websocket"
-else
+else:
   HA_URL = "ws://172.30.32.1:8123/api/websocket"
   ssl_context = None
 
