@@ -5,6 +5,8 @@ import os
 from datetime import datetime
 import ssl
 
+print(f"collector.py started. websockets library version: {websockets.__version__}")
+
 HA_TOKEN = os.environ.get("HA_TOKEN")
 USE_SSL = os.environ.get("USE_SSL")
 
