@@ -24,7 +24,7 @@ else:
   ssl_context = None
 
 async def get_zha_data():
-    print(f"Connecting to websocket URL: {HA_URL} (SSL enabled: {USE_SSL})")
+    print(f"Connecting to websocket URL: {HA_URL} (SSL enabled: {USE_SSL}) HA_TOKEN: {HA_TOKEN}")
 
     try:
         async with websockets.connect(HA_URL, ssl=ssl_context if USE_SSL else None) as ws:
