@@ -24,92 +24,90 @@ else:
   ssl_context = None
 
 async def get_zha_data():
-    if not HA_TOKEN:
-        raise EnvironmentError("HA_TOKEN is not set. Please provide it via the add-on configuration.")
+    print(f"Connecting to websocket URL: {HA_URL} (SSL enabled: {USE_SSL})")
 
-    print(f"Connecting to websocket URL: {HA_URL} (SSL enabled: {USE_SSL}")
-
-    async with websockets.connect(HA_URL, ssl=ssl_context) as ws:
-        msg_id = 1
-
-        print("Connected")
-
-        # Step 1: receive 'hello'
-        auth_required = json.loads(await ws.recv())
-        if auth_required.get("type") != "auth_required":
-            raise Exception("Expected 'auth_required', got something else")
-
-        print("Received auth_required:", json.dumps(auth_required))
-
-        # Step 2: send auth
-        await ws.send(json.dumps({
-            "type": "auth",
-            "access_token": HA_TOKEN
-        }))
-
-        # Step 3: wait for auth_ok
-        while True:
-            response = json.loads(await ws.recv())
-            print("Auth response:", response)
-            if response.get("type") == "auth_ok":
-                break
-            elif response.get("type") == "auth_invalid":
-                raise Exception("Authentication failed")
-
-        # Step 4: request ZHA device list
-        await ws.send(json.dumps({
-            "id": msg_id,
-            "type": "zha/devices"
-        }))
-        msg_id += 1
-
-        devices_msg = await ws.recv()
-        devices = json.loads(devices_msg).get("result", [])
-        output = []
-
-        for device in devices:
-            ieee = device.get("ieee")
-            name = device.get("user_given_name") or device.get("name") or "Unknown"
-            last_seen = device.get("last_seen")
-
-            # Request neighbors
+    try:
+        async with websockets.connect(HA_URL, ssl=ssl_context if USE_SSL else None) as ws:
+            print("WebSocket connection established. Sending authentication...")
             await ws.send(json.dumps({
-                "id": msg_id,
-                "type": "zha/device_neighbors",
-                "ieee": ieee
+                "id": 1,
+                "type": "auth",
+                "access_token": ACCESS_TOKEN
             }))
-            neighbors_msg = await ws.recv()
-            neighbors = json.loads(neighbors_msg).get("result", [])
-            msg_id += 1
+            auth_response = json.loads(await ws.recv())
 
-            output.append({
-                "name": name,
-                "last_seen": last_seen,
-                "area": device.get("area", ""),
-                "manufacturer": device.get("manufacturer", ""),
-                "model": device.get("model", ""),
-                "quirk": device.get("quirk_class", ""),
-                "lqi": device.get("lqi"),
-                "rssi": device.get("rssi"),
-                "ieee": ieee,
-                "nwk": device.get("nwk"),
-                "device_type": device.get("device_type", ""),
-                "power_source": device.get("power_source", ""),
-                "attributes": device.get("attributes", {}),
-                "neighbors": neighbors
-            })
+            if auth_response.get("type") == "auth_ok":
+                print("Authentication successful!")
 
-            await asyncio.sleep(0.1)
+                # --- NEW: Request ZHA Network Info to get neighbor data ---
+                await ws.send(json.dumps({
+                    "id": 2, # Unique ID for this message
+                    "type": "zha/network_info"
+                }))
+                network_info_response = json.loads(await ws.recv())
 
-        # Save output
-        os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
-        with open(OUTPUT_FILE, "w") as f:
-            json.dump({
-                "timestamp": datetime.utcnow().isoformat(),
-                "devices": output
-            }, f, indent=2)
+                network_nodes = {}
+                if network_info_response.get("success"):
+                    # Process nodes from network_info
+                    for node in network_info_response.get("result", {}).get("nodes", []):
+                        network_nodes[node["ieee"]] = node # Store by IEEE for easy lookup
+                    print(f"Received ZHA network info for {len(network_nodes)} nodes.")
+                else:
+                    print(f"Failed to get ZHA network info: {network_info_response.get('error', 'Unknown error')}")
 
-        print(f"Saved ZHA device data to {OUTPUT_FILE}")
+
+                # Request ZHA Device Info (your existing call)
+                await ws.send(json.dumps({
+                    "id": 3, # New unique ID
+                    "type": "zha/devices/info"
+                }))
+                devices_info_response = json.loads(await ws.recv())
+
+                final_devices_data = []
+                if devices_info_response.get("success"):
+                    devices_list = devices_info_response.get("result", [])
+                    print(f"Received ZHA device info for {len(devices_list)} devices.")
+
+                    # Merge device info with network info (especially neighbors)
+                    for device in devices_list:
+                        ieee = device.get("ieee")
+                        if ieee and ieee in network_nodes:
+                            # Add neighbors and routes from network_nodes if available
+                            device['neighbors'] = network_nodes[ieee].get('neighbors', [])
+                            # device['routes'] = network_nodes[ieee].get('routes', []) # Optional: if you want routes too
+                        else:
+                            device['neighbors'] = [] # Ensure neighbors key exists even if not found in network_info
+
+                        final_devices_data.append(device)
+
+                else:
+                    print(f"Failed to get ZHA device info: {devices_info_response.get('error', 'Unknown error')}")
+                
+                current_time_utc = datetime.utcnow().isoformat(timespec='seconds') + 'Z'
+                output_data = {
+                    "last_updated": current_time_utc,
+                    "devices": final_devices_data
+                }
+
+                with open(DATA_FILE_PATH, "w") as f:
+                    json.dump(output_data, f, indent=4)
+                print(f"ZHA data saved to {DATA_FILE_PATH}")
+
+            else:
+                print(f"Authentication failed: {auth_response}")
+
+    except ssl.SSLCertVerificationError as e:
+        print(f"ERROR: SSL Certificate Verification Failed: {e}")
+        print("This typically means the certificate is not valid for the IP you are using.")
+        print("For internal connections, consider using ssl_context to disable verification or disable SSL in add-on config.")
+    except websockets.exceptions.InvalidMessage as e:
+        print(f"ERROR: WebSocket invalid message during handshake: {e}")
+        print("This often indicates Home Assistant immediately closed the connection.")
+    except EOFError as e:
+        print(f"ERROR: EOFError during WebSocket connection: {e}")
+        print("This means the connection was closed prematurely by the server.")
+    except Exception as e:
+        print(f"An unexpected error occurred during WebSocket connection or data processing: {e}")
 
 
 if __name__ == "__main__":

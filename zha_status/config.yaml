@@ -1,5 +1,5 @@
 name: ZHA Device Status
-version: "0.89"
+version: "0.90"
 slug: zha_status
 description: Tracks and displays Zigbee device data from ZHA
 startup: services

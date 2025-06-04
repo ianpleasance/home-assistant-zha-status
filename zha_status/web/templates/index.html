@@ -68,12 +68,10 @@
   <script>
     $(document).ready(function () {
       $('#zha-table').DataTable({
-        dom: 'Bfrtip',
+        dom: 'Blfrtip',
         buttons: ['csv'],
-        // --- START OF NEW CODE FOR PAGINATION ---
         "lengthMenu": [[25, 50, 100, 1000, -1], [25, 50, 100, 1000, "All"]],
         "pageLength": 100 // Default to 100
-        // --- END OF NEW CODE ---
       });
     });
   </script>
