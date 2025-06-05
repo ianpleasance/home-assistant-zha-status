@@ -10,11 +10,7 @@ USE_SSL = os.environ.get("USE_SSL")
 
 OUTPUT_FILE = "/app/data/zha_data.json"
 
-# WebSocket URL for Home Assistant (internal IP)
 if USE_SSL:
-  # Create an SSL context that disables hostname checking and certificate verification
-  # This is suitable for internal communication where the certificate is not issued
-  # for the internal IP address.
   ssl_context = ssl._create_unverified_context()
   HA_URL = "wss://172.30.32.1:8123/api/websocket"
 else:
@@ -29,11 +25,10 @@ async def get_zha_data():
 
     try:
         async with websockets.connect(HA_URL, ssl=ssl_context, max_size=None) as ws:
-            current_msg_id = 1 # Use a single counter for all message IDs
+            current_msg_id = 1 
 
             print("Connected")
 
-            # --- Authentication Handshake (as per your working code) ---
             auth_required = json.loads(await ws.recv())
             if auth_required.get("type") != "auth_required":
                 raise Exception("Expected 'auth_required', got something else")
@@ -54,11 +49,10 @@ async def get_zha_data():
                 elif response.get("type") == "auth_invalid":
                     raise Exception("Authentication failed")
                 else:
-                    # Continue waiting if unexpected message, but not auth_ok/invalid
                     print(f"WARNING: Received unexpected message type during authentication: {response.get('type')}. Full response: {response}")
 
 
-            # --- NEW: Fetch Area Registry for name lookup ---
+            # --- Fetch Area Registry ---
             area_map = {}
             await ws.send(json.dumps({"id": current_msg_id, "type": "config/area_registry/list"}))
             area_response = json.loads(await ws.recv())
@@ -70,8 +64,8 @@ async def get_zha_data():
                 print(f"Failed to fetch area registry: {area_response.get('error', 'Unknown error')}")
             current_msg_id += 1
 
-            # --- NEW: Fetch Entity Registry to map devices to entities ---
-            device_entities_map = {} # Maps device_id -> list of entity_ids
+            # --- Fetch Entity Registry ---
+            device_entities_map = {} 
             await ws.send(json.dumps({"id": current_msg_id, "type": "config/entity_registry/list"}))
             entity_response = json.loads(await ws.recv())
             if entity_response.get("success"):
@@ -80,23 +74,41 @@ async def get_zha_data():
                     if device_id:
                         if device_id not in device_entities_map:
                             device_entities_map[device_id] = []
-                        device_entities_map[device_id].append(entity_data) # Store full entity data for battery check
+                        device_entities_map[device_id].append(entity_data)
                 print(f"Fetched {len(entity_response.get('result', []))} entities.")
             else:
                 print(f"Failed to fetch entity registry: {entity_response.get('error', 'Unknown error')}")
             current_msg_id += 1
 
-            # --- NEW: Fetch all states to get current battery levels ---
-            all_states_map = {} # Maps entity_id -> entity_state_object
+            # --- Fetch all states ---
+            all_states_map = {} 
             await ws.send(json.dumps({"id": current_msg_id, "type": "get_states"}))
             states_response = json.loads(await ws.recv())
-            if states_response.get("success"): # get_states typically returns success: true/false
+            if states_response.get("success"): 
                 for state_data in states_response.get("result", []):
                     all_states_map[state_data["entity_id"]] = state_data
                 print(f"Fetched {len(all_states_map)} entity states.")
             else:
                 print(f"Failed to fetch states: {states_response.get('error', 'Unknown error')}")
             current_msg_id += 1
+
+            # --- NEW: Fetch ZHA Network Info (contains neighbors) ---
+            network_info_map = {} # Map IEEE -> neighbors list
+            await ws.send(json.dumps({
+                "id": current_msg_id,
+                "type": "zha/network_info" # <-- Changed from zha/device_neighbors
+            }))
+            network_info_raw = await ws.recv()
+            network_info_response = json.loads(network_info_raw)
+            current_msg_id += 1
+            
+            if network_info_response.get("success"):
+                # zha/network_info returns 'devices' which contains 'neighbors' for each
+                for dev_info in network_info_response.get("result", {}).get("devices", []):
+                    network_info_map[dev_info["ieee"]] = dev_info.get("neighbors", [])
+                print(f"Fetched network info for {len(network_info_map)} devices.")
+            else:
+                print(f"WARNING: Failed to fetch ZHA network info: {network_info_response.get('error', 'Unknown error')}. Neighbors data might be incomplete.")
 
 
             # --- Request ZHA device list (your original request type) ---
@@ -117,23 +129,15 @@ async def get_zha_data():
                 name = device.get("user_given_name") or device.get("name") or "Unknown"
                 last_seen = device.get("last_seen")
                 
-                # --- Get Area Name ---
-                # Home Assistant's internal device_id (for mapping to entity registry)
-                device_id = device.get("device_id") # zha/devices response often includes this
+                device_id = device.get("device_id") 
 
                 device_area_name = "N/A"
-                if device.get("area_id"): # Check if area_id is directly available from zha/devices
+                if device.get("area_id"): 
                     device_area_name = area_map.get(device["area_id"], "Unknown Area")
-                # Fallback if zha/devices doesn't have area_id directly, but device_registry might
-                elif device_id:
-                    # In a robust solution, you'd fetch device_registry/list to map device_id to area_id
-                    # For this specific request, we rely on area_id from zha/devices or skip
-                    pass
+                
 
-
-                # --- Get Exposed Sensors (Entity IDs) and Battery Level ---
                 exposed_sensor_entity_ids = []
-                battery_level = None # Will store the actual battery percentage
+                battery_level = None 
                 
                 if device_id and device_id in device_entities_map:
                     for entity_data in device_entities_map[device_id]:
@@ -141,41 +145,26 @@ async def get_zha_data():
                         if entity_id:
                             exposed_sensor_entity_ids.append(entity_id)
 
-                            # Check for battery sensor
-                            # Heuristic: device_class 'battery' OR entity_id contains 'battery' and unit_of_measurement is '%'
                             if entity_data.get("device_class") == "battery" or \
                                 ("battery" in entity_id.lower() and entity_data.get("unit_of_measurement") == "%"):
                                 
                                 if entity_id in all_states_map:
                                     state_obj = all_states_map[entity_id]
                                     try:
-                                        # Attempt to convert state to float if it's numeric
                                         battery_level = float(state_obj.get("state"))
                                     except (ValueError, TypeError):
-                                        battery_level = state_obj.get("state") # Keep as is if not numeric
+                                        battery_level = state_obj.get("state") 
 
+                # --- Get neighbors from network_info_map ---
+                neighbors = network_info_map.get(ieee, [])
+                if not neighbors:
+                    print(f"No neighbors found in network_info for {name} (IEEE: {ieee}) or network_info call failed.")
 
-                # --- Request neighbors (as before) ---
-                print(f"Requesting neighbors for device '{name}' (IEEE: {ieee})...")
-                await ws.send(json.dumps({
-                    "id": current_msg_id,
-                    "type": "zha/device_neighbors",
-                    "ieee": ieee
-                }))
-                neighbors_msg_raw = await ws.recv()
-                print(f"Raw neighbors response for {ieee}: {neighbors_msg_raw}")
-
-                neighbors_response_parsed = json.loads(neighbors_msg_raw)
-                neighbors = neighbors_response_parsed.get("result", [])
-                
-                if not neighbors_response_parsed.get("success", False):
-                    print(f"WARNING: zha/device_neighbors call for {ieee} was not successful. Response: {neighbors_response_parsed}")
-                current_msg_id += 1
 
                 output.append({
                     "name": name,
                     "last_seen": last_seen,
-                    "area": device_area_name, # Added Home Assistant Area
+                    "area": device_area_name, 
                     "manufacturer": device.get("manufacturer", ""),
                     "model": device.get("model", ""),
                     "quirk": device.get("quirk_class", ""),
@@ -186,12 +175,12 @@ async def get_zha_data():
                     "device_type": device.get("device_type", ""),
                     "power_source": device.get("power_source", ""),
                     "attributes": device.get("attributes", {}),
-                    "neighbors": neighbors,
-                    "exposed_sensors": exposed_sensor_entity_ids, # Added list of exposed sensors (entity IDs)
-                    "battery_level": battery_level # Added battery level if available
+                    "neighbors": neighbors, # Populated from network_info_map
+                    "exposed_sensors": exposed_sensor_entity_ids, 
+                    "battery_level": battery_level 
                 })
 
-                await asyncio.sleep(0.1) # Small delay between device requests
+                await asyncio.sleep(0.1)
 
             # Save output
             os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
@@ -215,11 +204,4 @@ async def get_zha_data():
 if __name__ == "__main__":
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
     asyncio.run(get_zha_data())
-    # Optional: If you want this to run repeatedly, uncomment and configure below
-    # import time
-    # scan_interval_minutes = int(os.environ.get("SCAN_INTERVAL_MINUTES", 10))
-    # print(f"Scheduling data collection every {scan_interval_minutes} minutes.")
-    # while True:
-    #     time.sleep(scan_interval_minutes * 60)
-    #     asyncio.run(get_zha_data())
 
