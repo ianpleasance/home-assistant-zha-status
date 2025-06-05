@@ -28,7 +28,7 @@ async def get_zha_data():
     print(f"Connecting to websocket URL: {HA_URL} (SSL enabled: {USE_SSL})")
 
     try:
-        async with websockets.connect(HA_URL, ssl=ssl_context) as ws:
+        async with websockets.connect(HA_URL, ssl=ssl_context, max_size=None) as ws:
             current_msg_id = 1 # Use a single counter for all message IDs
 
             print("Connected")
