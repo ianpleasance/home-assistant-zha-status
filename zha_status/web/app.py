@@ -58,5 +58,54 @@ def refresh_data():
 
     return redirect(url_for('index'))
 
+@app.route('/api/stats')
+def get_stats():
+    """
+    Returns ZHA device statistics as a JSON object.
+    """
+    stats = {
+        "total_devices": 0,
+        "online_devices": 0,
+        "offline_devices": 0,
+        "low_battery_devices": 0,
+        "last_data_update": "N/A"
+    }
+    
+    try:
+        with open(DATA_FILE_PATH, 'r') as f:
+            data = json.load(f)
+            stats["last_data_update"] = data.get("timestamp", "N/A")
+            
+            devices = data.get("devices", [])
+            stats["total_devices"] = len(devices)
+
+            current_utc = datetime.utcnow()
+            
+            for d in devices:
+                # Online/Offline calculation (matches logic in index.html)
+                last_seen_str = d.get("last_seen")
+                if last_seen_str:
+                    # Remove 'Z' for fromisoformat compatibility and handle potential microseconds
+                    last_dt = datetime.fromisoformat(last_seen_str.replace('Z', ''))
+                    ago = current_utc - last_dt
+                    if ago.total_seconds() < 3600: # Less than 1 hour ago
+                        stats["online_devices"] += 1
+                    else:
+                        stats["offline_devices"] += 1
+                else: # Devices with no last_seen are considered offline
+                    stats["offline_devices"] += 1
+
+                # Low Battery calculation
+                battery_level = d.get("battery_level")
+                # Ensure battery_level is a number before comparing
+                if isinstance(battery_level, (int, float)) and battery_level <= 20:
+                    stats["low_battery_devices"] += 1
+                    
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"ERROR: Could not load or parse ZHA data for stats: {e}")
+        # If file not found or malformed, stats remain default (zeros/N/A)
+        
+    return jsonify(stats)
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
