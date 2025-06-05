@@ -39,7 +39,6 @@
         <th>Device Name</th>
         <th>Area</th>
         <th>Last Seen</th>
-        <th>Area</th>
         <th>Manufacturer</th>
         <th>Model</th>
         <th>Quirk</th>
@@ -57,13 +56,16 @@
     <tbody>
       {% for d in data.devices %}
       {% set last = d.last_seen or '' %}
-      {% set ago = (datetime.utcnow() - datetime.fromisoformat(last.replace('Z', ''))) if last else 9999 %}
+      {# Define datetime.utcnow and datetime.fromisoformat for use in template #}
+      {% set current_utc = now().utcnow() %} {# Assuming 'now()' is available, if not, handle in app.py #}
+      {% set last_dt = current_utc if not last else fromisoformat(last.replace('Z', '')) %}
+      {% set ago = (current_utc - last_dt) if last else timedelta(seconds=9999) %}
       {% set cls = 'online' if ago.total_seconds() < 3600 else 'offline' %}
       <tr>
         <td class="{{ cls }}">{{ d.name }}</td>
-        <td>{{ device.area if device.area else 'N/A' }}</td>
+        <td>{{ d.area if d.area else 'N/A' }}</td>
         <td>{{ d.last_seen }}</td>
-        <td>{{ d.area }}</td>
+        {# Removed the duplicate <td>{{ d.area }}</td> #}
         <td>{{ d.manufacturer }}</td>
         <td>{{ d.model }}</td>
         <td>{{ d.quirk }}</td>
@@ -74,26 +76,26 @@
         <td>{{ d.device_type }}</td>
         <td>{{ d.power_source }}</td>
         <td>
-            {% if device.battery_level is not none %}
-                {% if device.battery_level <= 20 %}
-                    <span class="battery-low">{{ device.battery_level }}%</span>
+            {% if d.battery_level is not none %}
+                {% if d.battery_level <= 20 %}
+                    <span class="battery-low">{{ d.battery_level }}%</span>
                 {% else %}
-                    <span class="battery-ok">{{ device.battery_level }}%</span>
+                    <span class="battery-ok">{{ d.battery_level }}%</span>
                 {% endif %}
             {% else %}
                 N/A
             {% endif %}
         </td>
         <td>
-            {% if device.exposed_sensors %}
-                <pre>{{ device.exposed_sensors | join(', ') }}</pre>
+            {% if d.exposed_sensors %}
+                <pre>{{ d.exposed_sensors | join(', ') }}</pre>
             {% else %}
                 N/A
             {% endif %}
-         </td>
-         <td>
-            {% if device.neighbors %}
-                <pre>{{ device.neighbors | tojson(2) }}</pre>
+          </td>
+          <td>
+            {% if d.neighbors %}
+                <pre>{{ d.neighbors | tojson(2) }}</pre>
             {% else %}
                 No Neighbors
             {% endif %}
@@ -103,15 +105,15 @@
     </tbody>
   </table>
 
-  <script>
-    $(document).ready(function () {
-      $('#zha-table').DataTable({
-        dom: 'Blfrtip',
-        buttons: ['csv'],
+  <script>
+    $(document).ready(function () {
+      $('#zha-table').DataTable({
+        dom: 'Blfrtip',
+        buttons: ['csv'],
         "lengthMenu": [[25, 50, 100, 1000, -1], [25, 50, 100, 1000, "All"]],
         "pageLength": 100 // Default to 100
-      });
-    });
-  </script>
+      });
+    });
+  </script>
 </body>
 </html>

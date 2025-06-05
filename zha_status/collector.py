@@ -92,18 +92,18 @@ async def get_zha_data():
                 print(f"Failed to fetch states: {states_response.get('error', 'Unknown error')}")
             current_msg_id += 1
 
-            # --- NEW: Fetch ZHA Network Info (contains neighbors) ---
+            # --- Fetch ZHA Network Info (contains neighbors) ---
             network_info_map = {} # Map IEEE -> neighbors list
             await ws.send(json.dumps({
                 "id": current_msg_id,
-                "type": "zha/network_info" # <-- Changed from zha/device_neighbors
+                "type": "zha/network_info"
             }))
             network_info_raw = await ws.recv()
+            print(f"Raw ZHA network info response: {network_info_raw}") # *** NEW DEBUG PRINT HERE ***
             network_info_response = json.loads(network_info_raw)
             current_msg_id += 1
             
             if network_info_response.get("success"):
-                # zha/network_info returns 'devices' which contains 'neighbors' for each
                 for dev_info in network_info_response.get("result", {}).get("devices", []):
                     network_info_map[dev_info["ieee"]] = dev_info.get("neighbors", [])
                 print(f"Fetched network info for {len(network_info_map)} devices.")
@@ -175,7 +175,7 @@ async def get_zha_data():
                     "device_type": device.get("device_type", ""),
                     "power_source": device.get("power_source", ""),
                     "attributes": device.get("attributes", {}),
-                    "neighbors": neighbors, # Populated from network_info_map
+                    "neighbors": neighbors, 
                     "exposed_sensors": exposed_sensor_entity_ids, 
                     "battery_level": battery_level 
                 })
