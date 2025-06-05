@@ -8,23 +8,37 @@
   <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
   <style>
-    table { width: 100%; }
     .online { color: green; font-weight: bold; }
     .offline { color: red; font-weight: bold; }
+
+    body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+    h1 { color: #0056b3; }
+    .last-updated { font-size: 0.9em; color: #666; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; background-color: #fff; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background-color: #e2e2e2; color: #333; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    tr:hover { background-color: #e0e0e0; }
+    pre { white-space: pre-wrap; word-wrap: break-word; font-size: 0.85em; background-color: #f0f0f0; padding: 5px; border-radius: 3px; }
+    .battery-low { color: red; font-weight: bold; }
+    .battery-ok { color: green; }
+    </style>
+
   </style>
 </head>
 <body>
   <h1>ZHA Device Status</h1>
   {% if data.timestamp %}
-  <p>Last Data Update: {{ data.timestamp }}</p>
+  <p class="last-updated" >Last Data Update: {{ data.timestamp }}</p>
   {% else %}
-  <p>No data collected yet.</p>
+  <p class="last-updated">No data collected yet.</p>
   {% endif %}
   <p><a href="/refresh">🔁 Refresh Now</a></p>
   <table id="zha-table" class="display">
     <thead>
       <tr>
         <th>Device Name</th>
+        <th>Area</th>
         <th>Last Seen</th>
         <th>Area</th>
         <th>Manufacturer</th>
@@ -36,8 +50,9 @@
         <th>Nwk</th>
         <th>Device Type</th>
         <th>Power Source</th>
+        <th>Battery Level</th>
+        <th>Sensors</th>
         <th>Neighbors</th>
-        <th>Attributes</th>
       </tr>
     </thead>
     <tbody>
@@ -47,6 +62,7 @@
       {% set cls = 'online' if ago.total_seconds() < 3600 else 'offline' %}
       <tr>
         <td class="{{ cls }}">{{ d.name }}</td>
+        <td>{{ device.area if device.area else 'N/A' }}</td>
         <td>{{ d.last_seen }}</td>
         <td>{{ d.area }}</td>
         <td>{{ d.manufacturer }}</td>
@@ -58,8 +74,31 @@
         <td>0x{{ "%04x" % d.nwk if d.nwk is not none else '' }}</td>
         <td>{{ d.device_type }}</td>
         <td>{{ d.power_source }}</td>
-        <td>{{ d.neighbors }}</td>
-        <td><pre>{{ d.attributes }}</pre></td>
+        <td>
+            {% if device.battery_level is not none %}
+                {% if device.battery_level <= 20 %}
+                    <span class="battery-low">{{ device.battery_level }}%</span>
+                {% else %}
+                    <span class="battery-ok">{{ device.battery_level }}%</span>
+                {% endif %}
+            {% else %}
+                N/A
+            {% endif %}
+        </td>
+        <td>
+            {% if device.exposed_sensors %}
+                <pre>{{ device.exposed_sensors | join(', ') }}</pre>
+            {% else %}
+                N/A
+            {% endif %}
+         </td>
+         <td>
+            {% if device.neighbors %}
+                <pre>{{ device.neighbors | tojson(2) }}</pre>
+            {% else %}
+                No Neighbors
+            {% endif %}
+        </td>
       </tr>
       {% endfor %}
     </tbody>
