@@ -63,8 +63,8 @@
       {% set ago = (current_utc - last_dt) if last else timedelta_class(seconds=9999) %}
       {% set cls = 'online' if ago.total_seconds() < 3600 else 'offline' %}
       <tr>
-        <td class="{{ cls }}">{{ d.name | replace(' ', '&nbsp;') }}</td>
-        <td>{{ (d.area | replace(' ', '&nbsp;')) if d.area else 'N/A' }}</td>
+        <td class="{{ cls }}">{{ (d.name | replace(' ', '&nbsp;'))|safe }}</td>
+        <td>{{ (d.area | replace(' ', '&nbsp;'))|safe if d.area else 'N/A' }}</td>
         <td>{{ d.last_seen }}</td>
         <td>{{ d.manufacturer }}</td>
         <td>{{ d.model }}</td>

@@ -8,6 +8,9 @@ import ssl
 # --- Configuration (from environment variables, typical for add-ons) ---
 HA_TOKEN = os.environ.get("HA_TOKEN")
 USE_SSL = os.environ.get("USE_SSL")
+# New: DEBUG option
+# Convert string environment variable to boolean. Defaults to False if not set or invalid.
+DEBUG = os.environ.get("DEBUG", "false").lower() in ('true', '1', 'yes')
 
 # --- Output File Path ---
 OUTPUT_FILE = "/app/data/zha_data.json" # Standard path for add-on data storage
@@ -20,30 +23,45 @@ else:
   HA_URL = "ws://172.30.32.1:8123/api/websocket" # Insecure WebSocket URL
   ssl_context = None # No SSL context needed for ws://
 
+# --- Helper function for logging with timestamps ---
+def log_message(message, level="info"):
+    """
+    Prints a log message with a UTC timestamp.
+    'debug' level messages are only shown if DEBUG is True.
+    'info' and 'error' level messages are always shown.
+    """
+    timestamp = datetime.utcnow().isoformat(timespec='milliseconds') + 'Z'
+    if level == "debug" and not DEBUG:
+        return # Skip debug messages if DEBUG is False
+    print(f"[{timestamp}] {level.upper()}: {message}")
+
 async def get_zha_data():
     """
     Connects to Home Assistant WebSocket API, fetches ZHA device data,
     and saves it to a JSON file.
     """
+    log_message("Starting ZHA data collection.", level="info")
+
     if not HA_TOKEN:
-        # Exit if authentication token is not provided
+        log_message("HA_TOKEN is not set. Please provide it via the add-on configuration.", level="error")
         raise EnvironmentError("HA_TOKEN is not set. Please provide it via the add-on configuration.")
 
-    print(f"Connecting to websocket URL: {HA_URL} (SSL enabled: {USE_SSL})")
+    log_message(f"Connecting to websocket URL: {HA_URL} (SSL enabled: {USE_SSL})", level="debug")
 
     try:
         # Establish WebSocket connection
         async with websockets.connect(HA_URL, ssl=ssl_context, max_size=None) as ws:
             current_msg_id = 1 # Initialize message ID for API requests
 
-            print("Connected to Home Assistant WebSocket.")
+            log_message("Connected to Home Assistant WebSocket.", level="debug")
 
             # --- Authentication Process ---
             auth_required = json.loads(await ws.recv())
             if auth_required.get("type") != "auth_required":
+                log_message(f"Expected 'auth_required' message, but received: {auth_required.get('type')}", level="error")
                 raise Exception("Expected 'auth_required' message, but received something else during connection.")
 
-            print("Received auth_required message. Sending authentication token...")
+            log_message("Received auth_required message. Sending authentication token...", level="debug")
 
             await ws.send(json.dumps({
                 "type": "auth",
@@ -53,12 +71,13 @@ async def get_zha_data():
             # Wait for authentication response
             auth_response = json.loads(await ws.recv())
             if auth_response.get("type") == "auth_ok":
-                print("Authentication successful!")
+                log_message("Authentication successful!", level="debug")
             elif auth_response.get("type") == "auth_invalid":
+                log_message(f"Authentication failed: {auth_response.get('message', 'Invalid token.')}", level="error")
                 raise Exception(f"Authentication failed: {auth_response.get('message', 'Invalid token.')}")
             else:
-                print(f"WARNING: Received unexpected message type during authentication: {auth_response.get('type')}. Full response: {auth_response}")
-            
+                log_message(f"Received unexpected message type during authentication: {auth_response.get('type')}. Full response: {auth_response}", level="warning") # Use warning level for unexpected but not fatal
+
             # --- Fetch Area Registry ---
             area_map = {} # Maps area_id to area_name
             await ws.send(json.dumps({"id": current_msg_id, "type": "config/area_registry/list"}))
@@ -67,9 +86,9 @@ async def get_zha_data():
             if area_response.get("success"):
                 for area_data in area_response.get("result", []):
                     area_map[area_data["area_id"]] = area_data["name"]
-                print(f"Fetched {len(area_map)} areas.")
+                log_message(f"Fetched {len(area_map)} areas.", level="debug")
             else:
-                print(f"WARNING: Failed to fetch area registry: {area_response.get('error', 'Unknown error')}. Area names might be incomplete.")
+                log_message(f"Failed to fetch area registry: {area_response.get('error', 'Unknown error')}. Area names might be incomplete.", level="warning")
 
             # --- Fetch Entity Registry ---
             device_entities_map = {} # Maps device_id to a list of its entities
@@ -83,9 +102,9 @@ async def get_zha_data():
                         if device_id not in device_entities_map:
                             device_entities_map[device_id] = []
                         device_entities_map[device_id].append(entity_data)
-                print(f"Fetched {len(entity_response.get('result', []))} entities and mapped to devices.")
+                log_message(f"Fetched {len(entity_response.get('result', []))} entities and mapped to devices.", level="debug")
             else:
-                print(f"WARNING: Failed to fetch entity registry: {entity_response.get('error', 'Unknown error')}. Entity data might be incomplete.")
+                log_message(f"Failed to fetch entity registry: {entity_response.get('error', 'Unknown error')}. Entity data might be incomplete.", level="warning")
 
             # --- Fetch All Current States ---
             all_states_map = {} # Maps entity_id to its state object
@@ -95,14 +114,11 @@ async def get_zha_data():
             if states_response.get("success"): 
                 for state_data in states_response.get("result", []):
                     all_states_map[state_data["entity_id"]] = state_data
-                print(f"Fetched {len(all_states_map)} entity states.")
+                log_message(f"Fetched {len(all_states_map)} entity states.", level="debug")
             else:
-                print(f"WARNING: Failed to fetch all states: {states_response.get('error', 'Unknown error')}. State data might be incomplete.")
+                log_message(f"Failed to fetch all states: {states_response.get('error', 'Unknown error')}. State data might be incomplete.", level="warning")
 
             # --- Fetch ZHA Device List ---
-            # Note: The zha/network_info and zha/device_neighbors commands
-            # were removed due to "Unknown command" errors on your system.
-            # Neighbor data will not be collected directly via API in this version.
             await ws.send(json.dumps({
                 "id": current_msg_id,
                 "type": "zha/devices"
@@ -113,7 +129,7 @@ async def get_zha_data():
             devices = json.loads(devices_msg).get("result", [])
             output = [] # List to store processed device data
 
-            print(f"Processing {len(devices)} ZHA devices...")
+            log_message(f"Processing {len(devices)} ZHA devices...", level="debug")
 
             # --- Process Each ZHA Device ---
             for device in devices:
@@ -145,21 +161,15 @@ async def get_zha_data():
                                 if entity_id in all_states_map:
                                     state_obj = all_states_map[entity_id]
                                     try:
-                                        # Attempt to convert state to float for battery level
                                         battery_level = float(state_obj.get("state"))
                                     except (ValueError, TypeError):
-                                        # If conversion fails (e.g., state is 'unavailable', 'unknown'),
-                                        # set battery_level to None to indicate it's not a valid number.
-                                        battery_level = None
+                                        battery_level = None # If conversion fails, set to None
                                 else:
-                                    # If entity's state wasn't found, treat as unavailable
-                                    battery_level = None
-                                # Assuming a device generally has one primary battery sensor,
-                                # we can assign the first one found. If multiple, this picks one.
+                                    battery_level = None # If entity's state wasn't found, treat as unavailable
 
                 # Neighbors data is not available through the working API calls
                 neighbors = [] 
-                print(f"Neighbor data not available for {name} (IEEE: {ieee}).") # Informative message
+                log_message(f"Neighbor data not available for {name} (IEEE: {ieee}).", level="debug")
 
 
                 # Append processed device data to the output list
@@ -193,18 +203,17 @@ async def get_zha_data():
                     "devices": output
                 }, f, indent=2) # Pretty print JSON with 2-space indentation
 
-            print(f"Successfully saved ZHA device data to {OUTPUT_FILE}")
+            log_message(f"Successfully saved ZHA device data to {OUTPUT_FILE}", level="info")
 
     except websockets.exceptions.ConnectionClosedOK:
-        print("WebSocket connection closed gracefully.")
+        log_message("WebSocket connection closed gracefully.", level="info")
     except websockets.exceptions.ConnectionClosedError as e:
-        print(f"ERROR: WebSocket connection closed with an error: {e}")
+        log_message(f"WebSocket connection closed with an error: {e}", level="error")
     except Exception as e:
-        print(f"An unexpected error occurred during data collection: {e}")
+        log_message(f"An unexpected error occurred: {e}", level="error")
         import traceback
         traceback.print_exc() # Print full traceback for debugging
 
 if __name__ == "__main__":
-    # Ensure the output directory exists before running
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
-    asyncio.run(get_zha_data()) # Run the asynchronous data collection function
+    asyncio.run(get_zha_data())

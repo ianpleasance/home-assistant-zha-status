@@ -34,6 +34,7 @@ def refresh_data():
         # This is crucial for collector.py to authenticate with Home Assistant
         env["HA_TOKEN"] = os.environ.get("HA_TOKEN", "") 
         env["USE_SSL"] = os.environ.get("USE_SSL", "")
+        env["DEBUG"] = os.environ.get("DEBUG", "")
         
         # Execute collector.py as a separate Python process
         # This will block the web request until collector.py finishes its execution.
