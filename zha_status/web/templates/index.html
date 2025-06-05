@@ -37,7 +37,7 @@
     <thead>
       <tr>
         <th>Device Name</th>
-        <th>Area</th>
+        <th>Area</th> {# Correct Area header #}
         <th>Last Seen</th>
         <th>Manufacturer</th>
         <th>Model</th>
@@ -57,6 +57,8 @@
       {% for d in data.devices %}
       {% set last = d.last_seen or '' %}
       {# Use the passed datetime_module and timedelta_class #}
+      {# Make sure to handle potential timezone issues if last_seen isn't UTC. #}
+      {# The 'replace('Z', '')' is correct for ISO 8601 with Z. #}
       {% set current_utc = datetime_module.utcnow() %}
       {% set last_dt = current_utc if not last else datetime_module.fromisoformat(last.replace('Z', '')) %}
       {% set ago = (current_utc - last_dt) if last else timedelta_class(seconds=9999) %}
@@ -65,7 +67,6 @@
         <td class="{{ cls }}">{{ d.name }}</td>
         <td>{{ d.area if d.area else 'N/A' }}</td>
         <td>{{ d.last_seen }}</td>
-        {# Removed the duplicate <td>{{ d.area }}</td> #}
         <td>{{ d.manufacturer }}</td>
         <td>{{ d.model }}</td>
         <td>{{ d.quirk }}</td>
@@ -91,13 +92,6 @@
                 <pre>{{ d.exposed_sensors | join(', ') }}</pre>
             {% else %}
                 N/A
-            {% endif %}
-          </td>
-          <td>
-            {% if d.neighbors %}
-                <pre>{{ d.neighbors | tojson(2) }}</pre>
-            {% else %}
-                No Neighbors
             {% endif %}
         </td>
       </tr>

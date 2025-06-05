@@ -92,26 +92,13 @@ async def get_zha_data():
                 print(f"Failed to fetch states: {states_response.get('error', 'Unknown error')}")
             current_msg_id += 1
 
-            # --- Fetch ZHA Network Info (contains neighbors) ---
-            network_info_map = {} # Map IEEE -> neighbors list
-            await ws.send(json.dumps({
-                "id": current_msg_id,
-                "type": "zha/network_info"
-            }))
-            network_info_raw = await ws.recv()
-            print(f"Raw ZHA network info response: {network_info_raw}") # *** NEW DEBUG PRINT HERE ***
-            network_info_response = json.loads(network_info_raw)
-            current_msg_id += 1
-            
-            if network_info_response.get("success"):
-                for dev_info in network_info_response.get("result", {}).get("devices", []):
-                    network_info_map[dev_info["ieee"]] = dev_info.get("neighbors", [])
-                print(f"Fetched network info for {len(network_info_map)} devices.")
-            else:
-                print(f"WARNING: Failed to fetch ZHA network info: {network_info_response.get('error', 'Unknown error')}. Neighbors data might be incomplete.")
+            # --- NO LONGER FETCHING ZHA Network Info or Neighbors ---
+            # network_info_map = {} # This is removed
+            # await ws.send(json.dumps({"id": current_msg_id, "type": "zha/network_info"}))
+            # ... (removed related logic) ...
+            # current_msg_id += 1 # Adjusted if any msg IDs were removed
 
-
-            # --- Request ZHA device list (your original request type) ---
+            # --- Request ZHA device list ---
             await ws.send(json.dumps({
                 "id": current_msg_id,
                 "type": "zha/devices"
@@ -155,10 +142,10 @@ async def get_zha_data():
                                     except (ValueError, TypeError):
                                         battery_level = state_obj.get("state") 
 
-                # --- Get neighbors from network_info_map ---
-                neighbors = network_info_map.get(ieee, [])
-                if not neighbors:
-                    print(f"No neighbors found in network_info for {name} (IEEE: {ieee}) or network_info call failed.")
+                # Neighbors will now always be an empty list as we can't fetch them
+                neighbors = [] 
+                if not neighbors: # This check is now always true, but keeps the print for clarity
+                    print(f"Neighbor data not available for {name} (IEEE: {ieee}).")
 
 
                 output.append({
@@ -175,7 +162,7 @@ async def get_zha_data():
                     "device_type": device.get("device_type", ""),
                     "power_source": device.get("power_source", ""),
                     "attributes": device.get("attributes", {}),
-                    "neighbors": neighbors, 
+                    "neighbors": neighbors, # Always an empty list
                     "exposed_sensors": exposed_sensor_entity_ids, 
                     "battery_level": battery_level 
                 })
@@ -204,4 +191,3 @@ async def get_zha_data():
 if __name__ == "__main__":
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
     asyncio.run(get_zha_data())
-
