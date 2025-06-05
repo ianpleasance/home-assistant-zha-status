@@ -37,7 +37,7 @@
     <thead>
       <tr>
         <th>Device Name</th>
-        <th>Area</th> {# Correct Area header #}
+        <th>Area</th>
         <th>Last Seen</th>
         <th>Manufacturer</th>
         <th>Model</th>
@@ -63,8 +63,8 @@
       {% set ago = (current_utc - last_dt) if last else timedelta_class(seconds=9999) %}
       {% set cls = 'online' if ago.total_seconds() < 3600 else 'offline' %}
       <tr>
-        <td class="{{ cls }}">{{ d.name }}</td>
-        <td>{{ d.area if d.area else 'N/A' }}</td>
+        <td class="{{ cls }}">{{ d.name | replace(' ', '&nbsp;') }}</td>
+        <td>{{ (d.area | replace(' ', '&nbsp;')) if d.area else 'N/A' }}</td>
         <td>{{ d.last_seen }}</td>
         <td>{{ d.manufacturer }}</td>
         <td>{{ d.model }}</td>
