@@ -1,7 +1,7 @@
 from flask import Flask, render_template, redirect, url_for, jsonify
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
@@ -10,11 +10,21 @@ DATA_FILE_PATH = "/app/data/zha_data.json"
 @app.route('/')
 def index():
     try:
-        with open(DATA_FILE_PATH) as f:
+        with open(DATA_FILE_PATH, 'r') as f:
             data = json.load(f)
-    except:
-        data = {"devices": []}
-    return render_template("index.html", data=data, datetime=datetime)
+        # devices = data.get('devices', []) # No need to extract, pass 'data' directly if index.html uses data.devices
+        # last_updated = data.get('timestamp', 'N/A') # No need to extract if index.html uses data.timestamp
+    except FileNotFoundError:
+        data = {"devices": [], "timestamp": "No data yet. Collector might not have run."}
+    except json.JSONDecodeError:
+        data = {"devices": [], "timestamp": "Error decoding JSON data."}
+
+    # Pass datetime and timedelta to the template
+    return render_template("index.html",
+                           data=data,
+                           datetime_module=datetime,
+                           timedelta_class=timedelta)
+
 
 @app.route('/refresh')
 def refresh():

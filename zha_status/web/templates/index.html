@@ -56,10 +56,10 @@
     <tbody>
       {% for d in data.devices %}
       {% set last = d.last_seen or '' %}
-      {# Define datetime.utcnow and datetime.fromisoformat for use in template #}
-      {% set current_utc = now().utcnow() %} {# Assuming 'now()' is available, if not, handle in app.py #}
-      {% set last_dt = current_utc if not last else fromisoformat(last.replace('Z', '')) %}
-      {% set ago = (current_utc - last_dt) if last else timedelta(seconds=9999) %}
+      {# Use the passed datetime_module and timedelta_class #}
+      {% set current_utc = datetime_module.utcnow() %}
+      {% set last_dt = current_utc if not last else datetime_module.fromisoformat(last.replace('Z', '')) %}
+      {% set ago = (current_utc - last_dt) if last else timedelta_class(seconds=9999) %}
       {% set cls = 'online' if ago.total_seconds() < 3600 else 'offline' %}
       <tr>
         <td class="{{ cls }}">{{ d.name }}</td>
