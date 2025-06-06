@@ -1,0 +1,30 @@
+{
+  "schema": {
+    "ha_token": {
+      "type": "string",
+      "title": "Home Assistant Long-Lived Access Token",
+      "description": "Generate this in your Home Assistant Profile (click your user name -> bottom left, then \"Long-Lived Access Tokens\"). Required for connecting to HA."
+    },
+    "use_ssl": {
+      "type": "boolean",
+      "title": "Use SSL/TLS for HA Connection",
+      "description": "Enable this if your Home Assistant instance uses HTTPS/SSL/TLS (recommended). This will connect via wss://. If disabled, it will connect via ws://."
+    },
+    "debug": {
+      "type": "boolean",
+      "title": "Enable Debug Logging",
+      "description": "If enabled, the add-on will output more verbose messages to the add-on logs, including API commands and responses. Useful for troubleshooting."
+    },
+    "offline_threshold_minutes": {
+      "type": "integer",
+      "title": "Offline Threshold (minutes)",
+      "description": "The number of minutes of inactivity (no 'last_seen' update) after which a ZHA device is considered 'Offline'. This also triggers an increment of the device's \"Offline Count\" if it was previously online."
+    }
+  },
+  "default": {
+    "ha_token": "",
+    "use_ssl": false,
+    "debug": false,
+    "offline_threshold_minutes": 60
+  }
+}
