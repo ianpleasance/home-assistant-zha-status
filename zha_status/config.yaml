@@ -1,5 +1,5 @@
 name: ZHA Device Status
-version: "0.9993"
+version: "0.9994"
 slug: zha_status
 description: Tracks and displays Zigbee device data from ZHA
 startup: services
@@ -24,27 +24,27 @@ options:
   debug: false
   offline_threshold_minutes: 30
 schema:
-  ha_token: str
+  ha_token:
     type: str
     label: Home Assistant Long-Lived Access Token
     description: |
       A long-lived access token for your Home Assistant user.
       Generate this in your Home Assistant Profile (click your user name in the sidebar
       -> bottom left, then "Long-Lived Access Tokens"). Required for connecting to HA.
-  use_ssl: bool
+  use_ssl: 
     type: bool
     label: Use SSL/TLS for HA Connection
     description: |
       Enable this if your Home Assistant instance uses HTTPS/SSL/TLS (recommended).
       This will connect via wss://. If disabled, it will connect via ws://.
-  debug: bool
+  debug: 
     type: bool
     label: Enable Debug Logging
     description: |
       If enabled, the add-on will output more verbose messages to the add-on logs,
       including API commands and responses. Useful for troubleshooting.
   offline_threshold_minutes: int
-    type: int
+    type:
     label: Offline Threshold (minutes)
     description: |
       The number of minutes of inactivity (no 'last_seen' update) after which
