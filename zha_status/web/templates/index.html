@@ -3,15 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <title>ZHA Device Status</title>
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
     <style>
-        body { font-family: sans-serif; }
-        table { border-collapse: collapse; width: 100%; }
-        th, td { border: 1px solid black; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        tr:nth-child(even) { background-color: #f2f2f2; }
-        .offline { color: red; }
-        .online { color: green; }
-        .last-updated { font-style: italic; }
+        body { font-family: sans-serif; margin: 20px; }
+        h1 { color: #333; }
+        .last-updated { font-style: italic; color: #666; margin-bottom: 10px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; color: #333; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        tr:hover { background-color: #f1f1f1; }
+        .offline { color: red; font-weight: bold; }
+        .online { color: green; font-weight: bold; }
+        .refresh-button {
+            display: inline-block;
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .refresh-button:hover {
+            background-color: #0056b3;
+        }
     </style>
 </head>
 <body>
@@ -21,37 +36,53 @@
     {% else %}
     <p class="last-updated">No data collected yet.</p>
     {% endif %}
-    <p><a href="/refresh">🔁 Refresh Now</a></p>
+    <p><a href="/refresh" class="refresh-button">🔁 Refresh Now</a></p>
 
-    <table>
+    <table id="zhaDevicesTable">
         <thead>
             <tr>
                 <th>Name</th>
-                <th>Last Seen</th>
+                <th>Status</th> <th>Last Seen</th>
                 <th>Area</th>
                 <th>Manufacturer</th>
                 <th>Model</th>
                 <th>LQI</th>
                 <th>RSSI</th>
                 <th>IEEE</th>
-                <th>Offline Count</th>  <th>Status</th>         </tr>
+                <th>Offline Count</th>
+            </tr>
         </thead>
         <tbody>
             {% for d in data.devices %}
             <tr>
                 <td>{{ d.name }}</td>
-                <td>{{ d.last_seen if d.last_seen else 'N/A' }}</td>
+                <td class="{% if d.is_currently_offline %}offline{% else %}online{% endif %}">
+                    {% if d.is_currently_offline %}Offline{% else %}Online{% endif %}
+                </td> <td>{{ d.last_seen if d.last_seen else 'N/A' }}</td>
                 <td>{{ (d.area | replace(' ', '&nbsp;'))|safe if d.area else 'N/A' }}</td>
                 <td>{{ d.manufacturer }}</td>
                 <td>{{ d.model }}</td>
+                <td>{{ d.quirk }}</td> {# Re-added quirk if it was missing or implied #}
                 <td>{{ d.lqi }}</td>
                 <td>{{ d.rssi }}</td>
                 <td>{{ d.ieee }}</td>
-                <td>{{ d.offline_count }}</td>  <td class="{% if d.is_currently_offline %}offline{% else %}online{% endif %}">
-                    {% if d.is_currently_offline %}Offline{% else %}Online{% endif %}
-                </td> </tr>
+                <td>{{ d.offline_count }}</td>
+            </tr>
             {% endfor %}
         </tbody>
     </table>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('#zhaDevicesTable').DataTable({
+                "paging": true,      // Enable pagination
+                "searching": true,   // Enable search box
+                "ordering": true,    // Enable column ordering
+                "info": true         // Enable table information display
+            });
+        });
+    </script>
 </body>
 </html>
