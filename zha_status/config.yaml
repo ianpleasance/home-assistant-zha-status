@@ -43,8 +43,8 @@ schema:
     description: |
       If enabled, the add-on will output more verbose messages to the add-on logs,
       including API commands and responses. Useful for troubleshooting.
-  offline_threshold_minutes: int
-    type:
+  offline_threshold_minutes: 
+    type: int
     label: Offline Threshold (minutes)
     description: |
       The number of minutes of inactivity (no 'last_seen' update) after which
