@@ -1,112 +1,57 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>ZHA Device Status</title>
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
-  <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
-  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
-  <style>
-    .online { color: green; font-weight: bold; }
-    .offline { color: red; font-weight: bold; }
-
-    body { font-family: sans-serif; margin: 15px; background-color: #f4f4f4; color: #333; font-size: 0.8em; }
-    h1 { color: #0056b3; }
-    .last-updated { font-size: 0.9em; color: #666; margin-bottom: 20px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; background-color: #fff; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-    th { background-color: #e2e2e2; color: #333; }
-    tr:nth-child(even) { background-color: #f9f9f9; }
-    tr:hover { background-color: #e0e0e0; }
-    pre { white-space: pre-wrap; word-wrap: break-word; font-size: 0.85em; background-color: #f0f0f0; padding: 5px; border-radius: 3px; }
-    .battery-low { color: red; font-weight: bold; }
-    .battery-ok { color: green; }
+    <meta charset="UTF-8">
+    <title>ZHA Device Status</title>
+    <style>
+        body { font-family: sans-serif; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid black; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        .offline { color: red; }
+        .online { color: green; }
+        .last-updated { font-style: italic; }
     </style>
-
 </head>
 <body>
-  <h1>ZHA Device Status</h1>
-  {% if data.timestamp %}
-  <p class="last-updated" >Last Data Update: {{ data.timestamp }}</p>
-  {% else %}
-  <p class="last-updated">No data collected yet.</p>
-  {% endif %}
-  <p><a href="/refresh">🔁 Refresh Now</a></p>
-  <table id="zha-table" class="display">
-    <thead>
-      <tr>
-        <th>Device Name</th>
-        <th>Area</th>
-        <th>Last Seen</th>
-        <th>Manufacturer</th>
-        <th>Model</th>
-        <th>Quirk</th>
-        <th>LQI</th>
-        <th>RSSI</th>
-        <th>IEEE</th>
-        <th>Nwk</th>
-        <th>Device Type</th>
-        <th>Power Source</th>
-        <th>Battery Level</th>
-        <th>Sensors</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for d in data.devices %}
-      {% set last = d.last_seen or '' %}
-      {# Use the passed datetime_module and timedelta_class #}
-      {# Make sure to handle potential timezone issues if last_seen isn't UTC. #}
-      {# The 'replace('Z', '')' is correct for ISO 8601 with Z. #}
-      {% set current_utc = datetime_module.utcnow() %}
-      {% set last_dt = current_utc if not last else datetime_module.fromisoformat(last.replace('Z', '')) %}
-      {% set ago = (current_utc - last_dt) if last else timedelta_class(seconds=9999) %}
-      {% set cls = 'online' if ago.total_seconds() < 3600 else 'offline' %}
-      <tr>
-        <td class="{{ cls }}">{{ (d.name | replace(' ', '&nbsp;'))|safe }}</td>
-        <td>{{ (d.area | replace(' ', '&nbsp;'))|safe if d.area else 'N/A' }}</td>
-        <td>{{ d.last_seen }}</td>
-        <td>{{ d.manufacturer }}</td>
-        <td>{{ d.model }}</td>
-        <td>{{ d.quirk }}</td>
-        <td>{{ d.lqi }}</td>
-        <td>{{ d.rssi }}</td>
-        <td>{{ d.ieee }}</td>
-        <td>0x{{ "%04x" % d.nwk if d.nwk is not none else '' }}</td>
-        <td>{{ d.device_type }}</td>
-        <td>{{ d.power_source }}</td>
-        <td>
-            {% if d.battery_level is not none %}
-                {% if d.battery_level <= 20 %}
-                    <span class="battery-low">{{ d.battery_level }}%</span>
-                {% else %}
-                    <span class="battery-ok">{{ d.battery_level }}%</span>
-                {% endif %}
-            {% else %}
-                N/A
-            {% endif %}
-        </td>
-        <td>
-            {% if d.exposed_sensors %}
-                <pre>{{ d.exposed_sensors | join(', ') }}</pre>
-            {% else %}
-                N/A
-            {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+    <h1>ZHA Device Status</h1>
+    {% if data.timestamp %}
+    <p class="last-updated">Last Data Update: {{ data.timestamp }}</p>
+    {% else %}
+    <p class="last-updated">No data collected yet.</p>
+    {% endif %}
+    <p><a href="/refresh">🔁 Refresh Now</a></p>
 
-  <script>
-    $(document).ready(function () {
-      $('#zha-table').DataTable({
-        dom: 'Blfrtip',
-        buttons: ['csv'],
-        "lengthMenu": [[25, 50, 100, 1000, -1], [25, 50, 100, 1000, "All"]],
-        "pageLength": 100 // Default to 100
-      });
-    });
-  </script>
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Last Seen</th>
+                <th>Area</th>
+                <th>Manufacturer</th>
+                <th>Model</th>
+                <th>LQI</th>
+                <th>RSSI</th>
+                <th>IEEE</th>
+                <th>Offline Count</th>  <th>Status</th>         </tr>
+        </thead>
+        <tbody>
+            {% for d in data.devices %}
+            <tr>
+                <td>{{ d.name }}</td>
+                <td>{{ d.last_seen if d.last_seen else 'N/A' }}</td>
+                <td>{{ (d.area | replace(' ', '&nbsp;'))|safe if d.area else 'N/A' }}</td>
+                <td>{{ d.manufacturer }}</td>
+                <td>{{ d.model }}</td>
+                <td>{{ d.lqi }}</td>
+                <td>{{ d.rssi }}</td>
+                <td>{{ d.ieee }}</td>
+                <td>{{ d.offline_count }}</td>  <td class="{% if d.is_currently_offline %}offline{% else %}online{% endif %}">
+                    {% if d.is_currently_offline %}Offline{% else %}Online{% endif %}
+                </td> </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </body>
 </html>

@@ -6,8 +6,8 @@ import os
 
 app = Flask(__name__)
 
-DATA_FILE_PATH = "/app/data/zha_data.json" 
-COLLECTOR_SCRIPT_PATH = "/app/collector.py" 
+DATA_FILE_PATH = "/app/data/zha_data.json"
+COLLECTOR_SCRIPT_PATH = "/app/collector.py"
 
 @app.route('/')
 def index():
@@ -22,16 +22,16 @@ def index():
     return render_template("index.html",
                            data=data,
                            datetime_module=datetime,
-                           timedelta_class=timedelta) # Removed messages parameter
+                           timedelta_class=timedelta)
 
 @app.route('/refresh')
 def refresh_data():
     print("Triggering data refresh via collector.py...")
     try:
         env = os.environ.copy()
-        env["HA_TOKEN"] = os.environ.get("HA_TOKEN", "") 
+        env["HA_TOKEN"] = os.environ.get("HA_TOKEN", "")
         env["USE_SSL"] = os.environ.get("USE_SSL", "")
-        env["DEBUG"] = os.environ.get("DEBUG", "false") 
+        env["DEBUG"] = os.environ.get("DEBUG", "false")
 
         result = subprocess.run(
             ['python3', COLLECTOR_SCRIPT_PATH],
@@ -39,7 +39,7 @@ def refresh_data():
             text=True,
             env=env
         )
-        
+
         print(f"Collector script exited with code: {result.returncode}")
         if result.stdout:
             print("Collector stdout:\n", result.stdout)
@@ -49,7 +49,7 @@ def refresh_data():
         if result.returncode != 0:
             print(f"ERROR: Data refresh failed! Collector exited with code {result.returncode}. Check add-on logs.")
         else:
-            print("INFO: Data refresh complete!") # Log success message instead of flashing
+            print("INFO: Data refresh complete!")
 
     except FileNotFoundError:
         print(f"ERROR: Collector script not found at {COLLECTOR_SCRIPT_PATH}. Please check add-on configuration.")
@@ -70,41 +70,36 @@ def get_stats():
         "low_battery_devices": 0,
         "last_data_update": "N/A"
     }
-    
+
     try:
         with open(DATA_FILE_PATH, 'r') as f:
             data = json.load(f)
             stats["last_data_update"] = data.get("timestamp", "N/A")
-            
+
             devices = data.get("devices", [])
             stats["total_devices"] = len(devices)
 
             current_utc = datetime.utcnow()
-            
+
             for d in devices:
-                # Online/Offline calculation (matches logic in index.html)
                 last_seen_str = d.get("last_seen")
                 if last_seen_str:
-                    # Remove 'Z' for fromisoformat compatibility and handle potential microseconds
                     last_dt = datetime.fromisoformat(last_seen_str.replace('Z', ''))
                     ago = current_utc - last_dt
-                    if ago.total_seconds() < 3600: # Less than 1 hour ago
+                    if ago.total_seconds() < 3600:
                         stats["online_devices"] += 1
                     else:
                         stats["offline_devices"] += 1
-                else: # Devices with no last_seen are considered offline
+                else:
                     stats["offline_devices"] += 1
 
-                # Low Battery calculation
                 battery_level = d.get("battery_level")
-                # Ensure battery_level is a number before comparing
                 if isinstance(battery_level, (int, float)) and battery_level <= 20:
                     stats["low_battery_devices"] += 1
-                    
+
     except (FileNotFoundError, json.JSONDecodeError) as e:
         print(f"ERROR: Could not load or parse ZHA data for stats: {e}")
-        # If file not found or malformed, stats remain default (zeros/N/A)
-        
+
     return jsonify(stats)
 
 if __name__ == '__main__':

@@ -2,43 +2,40 @@ import asyncio
 import websockets
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta # Import timedelta for time calculations
 import ssl
 
 # --- Configuration (from environment variables, typical for add-ons) ---
 HA_TOKEN = os.environ.get("HA_TOKEN")
 USE_SSL = os.environ.get("USE_SSL")
-# New: DEBUG option
-# Convert string environment variable to boolean. Defaults to False if not set or invalid.
 DEBUG = os.environ.get("DEBUG", "false").lower() in ('true', '1', 'yes')
 
-# --- Output File Path ---
-OUTPUT_FILE = "/app/data/zha_data.json" # Standard path for add-on data storage
+# New: Configurable time for a device to be considered offline, in minutes
+OFFLINE_THRESHOLD_MINUTES = int(os.environ.get("OFFLINE_THRESHOLD_MINUTES", "60"))
+
+# --- File Paths ---
+OUTPUT_FILE = "/app/data/zha_data.json" # Main data output
+OFFLINE_COUNTS_FILE = "/app/data/offline_counts.json" # New file for persistent offline tracking
 
 # --- Home Assistant WebSocket URL ---
-if USE_SSL and USE_SSL.lower() == 'true': # Ensure USE_SSL is explicitly 'true' (string)
-  ssl_context = ssl._create_unverified_context() # Use unverified context for self-signed certs common in HA
-  HA_URL = "wss://172.30.32.1:8123/api/websocket" # Secure WebSocket URL
+if USE_SSL and USE_SSL.lower() == 'true':
+  ssl_context = ssl._create_unverified_context()
+  HA_URL = "wss://172.30.32.1:8123/api/websocket"
 else:
-  HA_URL = "ws://172.30.32.1:8123/api/websocket" # Insecure WebSocket URL
-  ssl_context = None # No SSL context needed for ws://
+  HA_URL = "ws://172.30.32.1:8123/api/websocket"
+  ssl_context = None
 
 # --- Helper function for logging with timestamps ---
 def log_message(message, level="info"):
-    """
-    Prints a log message with a UTC timestamp.
-    'debug' level messages are only shown if DEBUG is True.
-    'info' and 'error' level messages are always shown.
-    """
     timestamp = datetime.utcnow().isoformat(timespec='milliseconds') + 'Z'
     if level == "debug" and not DEBUG:
-        return # Skip debug messages if DEBUG is False
+        return
     print(f"[{timestamp}] {level.upper()}: {message}")
 
 async def get_zha_data():
     """
     Connects to Home Assistant WebSocket API, fetches ZHA device data,
-    and saves it to a JSON file.
+    calculates offline status and counts, and saves data to JSON files.
     """
     log_message("Starting ZHA data collection.", level="info")
 
@@ -48,14 +45,25 @@ async def get_zha_data():
 
     log_message(f"Connecting to websocket URL: {HA_URL} (SSL enabled: {USE_SSL})", level="debug")
 
+    # --- Load Persistent Offline Tracking Data ---
+    offline_tracking_data = {} # Stores {"ieee": {"count": N, "was_offline": True/False}}
     try:
-        # Establish WebSocket connection
+        os.makedirs(os.path.dirname(OFFLINE_COUNTS_FILE), exist_ok=True) # Ensure directory exists
+        with open(OFFLINE_COUNTS_FILE, 'r') as f:
+            offline_tracking_data = json.load(f)
+        log_message(f"Loaded offline tracking data for {len(offline_tracking_data)} devices.", level="debug")
+    except (FileNotFoundError, json.JSONDecodeError):
+        log_message("Offline tracking data file not found or is empty/corrupt. Starting fresh for counts.", level="debug")
+    except Exception as e:
+        log_message(f"ERROR: Could not load offline tracking data: {e}", level="error")
+
+
+    try:
         async with websockets.connect(HA_URL, ssl=ssl_context, max_size=None) as ws:
-            current_msg_id = 1 # Initialize message ID for API requests
+            current_msg_id = 1 
 
             log_message("Connected to Home Assistant WebSocket.", level="debug")
 
-            # --- Authentication Process ---
             auth_required = json.loads(await ws.recv())
             if auth_required.get("type") != "auth_required":
                 log_message(f"Expected 'auth_required' message, but received: {auth_required.get('type')}", level="error")
@@ -68,7 +76,6 @@ async def get_zha_data():
                 "access_token": HA_TOKEN
             }))
 
-            # Wait for authentication response
             auth_response = json.loads(await ws.recv())
             if auth_response.get("type") == "auth_ok":
                 log_message("Authentication successful!", level="debug")
@@ -76,10 +83,10 @@ async def get_zha_data():
                 log_message(f"Authentication failed: {auth_response.get('message', 'Invalid token.')}", level="error")
                 raise Exception(f"Authentication failed: {auth_response.get('message', 'Invalid token.')}")
             else:
-                log_message(f"Received unexpected message type during authentication: {auth_response.get('type')}. Full response: {auth_response}", level="warning") # Use warning level for unexpected but not fatal
-
-            # --- Fetch Area Registry ---
-            area_map = {} # Maps area_id to area_name
+                log_message(f"Received unexpected message type during authentication: {auth_response.get('type')}. Full response: {auth_response}", level="warning")
+            
+            # Fetch registries and states
+            area_map = {}
             await ws.send(json.dumps({"id": current_msg_id, "type": "config/area_registry/list"}))
             area_response = json.loads(await ws.recv())
             current_msg_id += 1
@@ -90,8 +97,7 @@ async def get_zha_data():
             else:
                 log_message(f"Failed to fetch area registry: {area_response.get('error', 'Unknown error')}. Area names might be incomplete.", level="warning")
 
-            # --- Fetch Entity Registry ---
-            device_entities_map = {} # Maps device_id to a list of its entities
+            device_entities_map = {}
             await ws.send(json.dumps({"id": current_msg_id, "type": "config/entity_registry/list"}))
             entity_response = json.loads(await ws.recv())
             current_msg_id += 1
@@ -106,8 +112,7 @@ async def get_zha_data():
             else:
                 log_message(f"Failed to fetch entity registry: {entity_response.get('error', 'Unknown error')}. Entity data might be incomplete.", level="warning")
 
-            # --- Fetch All Current States ---
-            all_states_map = {} # Maps entity_id to its state object
+            all_states_map = {}
             await ws.send(json.dumps({"id": current_msg_id, "type": "get_states"}))
             states_response = json.loads(await ws.recv())
             current_msg_id += 1
@@ -118,7 +123,6 @@ async def get_zha_data():
             else:
                 log_message(f"Failed to fetch all states: {states_response.get('error', 'Unknown error')}. State data might be incomplete.", level="warning")
 
-            # --- Fetch ZHA Device List ---
             await ws.send(json.dumps({
                 "id": current_msg_id,
                 "type": "zha/devices"
@@ -127,34 +131,67 @@ async def get_zha_data():
 
             devices_msg = await ws.recv()
             devices = json.loads(devices_msg).get("result", [])
-            output = [] # List to store processed device data
+            output = [] 
 
             log_message(f"Processing {len(devices)} ZHA devices...", level="debug")
+
+            current_utc = datetime.utcnow() # Define current_utc once for consistency
 
             # --- Process Each ZHA Device ---
             for device in devices:
                 ieee = device.get("ieee")
                 name = device.get("user_given_name") or device.get("name") or "Unknown Device"
-                last_seen = device.get("last_seen")
+                last_seen_str = device.get("last_seen") # Renamed to avoid clash with timedelta
                 
                 device_id = device.get("device_id") 
 
-                # Determine Area Name
                 device_area_name = "N/A"
                 if device.get("area_id"): 
                     device_area_name = area_map.get(device["area_id"], "Unknown Area")
                 
                 exposed_sensor_entity_ids = []
-                battery_level = None # Initialize battery_level for current device
+                battery_level = None
 
-                # Try to find battery level and other exposed sensors
+                # --- Calculate Offline Status and Count ---
+                device_offline_tracking = offline_tracking_data.get(ieee, {"count": 0, "was_offline": False})
+                offline_count = device_offline_tracking["count"]
+                was_previously_offline = device_offline_tracking["was_offline"]
+                is_currently_offline = False # Default assumption is online
+
+                if last_seen_str:
+                    try:
+                        last_dt = datetime.fromisoformat(last_seen_str.replace('Z', ''))
+                        time_since_last_seen = current_utc - last_dt
+                        # If time since last seen is greater than threshold, device is currently offline
+                        if time_since_last_seen.total_seconds() > OFFLINE_THRESHOLD_MINUTES * 60:
+                            is_currently_offline = True
+                    except ValueError:
+                        log_message(f"Could not parse last_seen '{last_seen_str}' for {name} (IEEE: {ieee}). Treating as offline.", level="warning")
+                        is_currently_offline = True # Treat unparseable last_seen as offline
+                else:
+                    # If last_seen is None or empty, device is considered offline
+                    is_currently_offline = True
+                
+                # Increment offline count if device just transitioned from online to offline
+                if is_currently_offline and not was_previously_offline:
+                    offline_count += 1
+                    log_message(f"Device {name} (IEEE: {ieee}) just went offline. New count: {offline_count}", level="debug")
+                
+                # Update current offline status for next run's tracking
+                offline_tracking_data[ieee] = {
+                    "count": offline_count,
+                    "was_offline": is_currently_offline
+                }
+                # --- End Offline Status and Count Calculation ---
+
+
+                # --- Battery Level Detection ---
                 if device_id and device_id in device_entities_map:
                     for entity_data in device_entities_map[device_id]:
                         entity_id = entity_data.get("entity_id")
                         if entity_id:
-                            exposed_sensor_entity_ids.append(entity_id) # Collect all exposed sensors
+                            exposed_sensor_entity_ids.append(entity_id)
 
-                            # Check if this entity is a battery sensor
                             if entity_data.get("device_class") == "battery" or \
                                 ("battery" in entity_id.lower() and entity_data.get("unit_of_measurement") == "%"):
                                 
@@ -163,19 +200,17 @@ async def get_zha_data():
                                     try:
                                         battery_level = float(state_obj.get("state"))
                                     except (ValueError, TypeError):
-                                        battery_level = None # If conversion fails, set to None
+                                        battery_level = None
                                 else:
-                                    battery_level = None # If entity's state wasn't found, treat as unavailable
-
-                # Neighbors data is not available through the working API calls
-                neighbors = [] 
+                                    battery_level = None
+                
+                neighbors = [] # Still not collecting neighbors via working API calls
                 log_message(f"Neighbor data not available for {name} (IEEE: {ieee}).", level="debug")
 
 
-                # Append processed device data to the output list
                 output.append({
                     "name": name,
-                    "last_seen": last_seen,
+                    "last_seen": last_seen_str, # Use the original string here
                     "area": device_area_name, 
                     "manufacturer": device.get("manufacturer", ""),
                     "model": device.get("model", ""),
@@ -187,32 +222,43 @@ async def get_zha_data():
                     "device_type": device.get("device_type", ""),
                     "power_source": device.get("power_source", ""),
                     "attributes": device.get("attributes", {}),
-                    "neighbors": neighbors, # This will always be an empty list
+                    "neighbors": neighbors, 
                     "exposed_sensors": exposed_sensor_entity_ids, 
-                    "battery_level": battery_level 
+                    "battery_level": battery_level,
+                    "offline_count": offline_count, # NEW: Add the offline count
+                    "is_currently_offline": is_currently_offline # NEW: Add current offline status
                 })
 
-                # Small delay to avoid overwhelming the Home Assistant API
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.05) # Reduced sleep slightly for faster processing
 
-            # --- Save Processed Data to JSON File ---
-            os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True) # Ensure directory exists
+            # --- Save Main Data to JSON File ---
+            os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
             with open(OUTPUT_FILE, "w") as f:
                 json.dump({
-                    "timestamp": datetime.utcnow().isoformat(), # Record data collection timestamp
+                    "timestamp": datetime.utcnow().isoformat(),
                     "devices": output
-                }, f, indent=2) # Pretty print JSON with 2-space indentation
+                }, f, indent=2)
 
             log_message(f"Successfully saved ZHA device data to {OUTPUT_FILE}", level="info")
+
+            # --- Save Persistent Offline Tracking Data ---
+            try:
+                os.makedirs(os.path.dirname(OFFLINE_COUNTS_FILE), exist_ok=True)
+                with open(OFFLINE_COUNTS_FILE, "w") as f:
+                    json.dump(offline_tracking_data, f, indent=2)
+                log_message(f"Saved offline tracking data to {OFFLINE_COUNTS_FILE}", level="debug")
+            except Exception as e:
+                log_message(f"ERROR: Could not save offline tracking data: {e}", level="error")
+
 
     except websockets.exceptions.ConnectionClosedOK:
         log_message("WebSocket connection closed gracefully.", level="info")
     except websockets.exceptions.ConnectionClosedError as e:
-        log_message(f"WebSocket connection closed with an error: {e}", level="error")
+        log_message(f"ERROR: WebSocket connection closed with an error: {e}", level="error")
     except Exception as e:
         log_message(f"An unexpected error occurred: {e}", level="error")
         import traceback
-        traceback.print_exc() # Print full traceback for debugging
+        traceback.print_exc()
 
 if __name__ == "__main__":
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)

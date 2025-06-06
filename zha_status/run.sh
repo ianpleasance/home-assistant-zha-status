@@ -4,6 +4,7 @@
 export HA_TOKEN=$(jq -r '.ha_token' /data/options.json)
 export USE_SSL=$(jq -r '.use_ssl' /data/options.json)
 export DEBUG=$(jq -r '.debug' /data/options.json)
+export OFFLINE_THRESHOLD_MINUTES=$(jq -r '.offline_threshold_minutes' /data/options.json)
 
 # Start Flask UI in background
 cd web
