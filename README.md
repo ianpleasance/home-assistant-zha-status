@@ -4,6 +4,8 @@
 
 A Home Assistant add-on providing a dedicated web interface to monitor the status of your Zigbee devices connected via ZHA. Get a quick overview of which devices are online, when they were last seen, their signal quality, battery levels, and track how many times they've gone offline.
 
+Please note, that I switched from ZHA to Zigbee2MQTT and so this repository is no longer being maintained. Feel free to fork it, or if you want to take it over entirely then email me.
+
 ---
 
 ## ✨ Features
